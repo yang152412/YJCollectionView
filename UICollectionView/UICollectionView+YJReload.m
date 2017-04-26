@@ -27,8 +27,10 @@
     NSMutableArray *addIndexPaths = [[NSMutableArray alloc] init];
     // need to delete
     NSMutableArray *deleteIndexPaths = [[NSMutableArray alloc] init];
+    NSRange addSectionsRange = NSMakeRange(0, 0),deleteSectionsRange = NSMakeRange(0, 0);
     // 1. find section count changes
     if (sectionsOffset > 0) { // add
+        addSectionsRange = NSMakeRange(sections, labs(sectionsOffset));
         for (NSInteger i = sections; i < newSections; i++) {
             // new section
             NSUInteger newCount = [self.dataSource collectionView:self numberOfItemsInSection:i];
@@ -36,6 +38,7 @@
             [addIndexPaths addObjectsFromArray:paths];
         }
     } else if (sectionsOffset < 0){ // delete
+        deleteSectionsRange = NSMakeRange(newSections, labs(sectionsOffset));
         for (NSInteger i = newSections; i < sections; i++) {
             NSUInteger newCount = [self.dataSource collectionView:self numberOfItemsInSection:i];
             NSArray *paths = [self createIndexPathInSection:i range:NSMakeRange(0, newCount)];
@@ -49,11 +52,24 @@
         [self changedItemInSection:i newIndexPaths:newIndexPaths addIndexPaths:addIndexPaths deletePaths:deleteIndexPaths];
     }
     
-    if (addIndexPaths.count > 0) {
-        [self insertItemsAtIndexPaths:addIndexPaths];
-    }
-    if (deleteIndexPaths.count > 0){
-        [self deleteItemsAtIndexPaths:deleteIndexPaths];
+    @try {
+        [self performBatchUpdates:^{
+            if (addSectionsRange.length > 0) {
+                [self insertSections:[NSIndexSet indexSetWithIndexesInRange:addSectionsRange]];
+            }
+            if (addIndexPaths.count > 0) {
+                [self insertItemsAtIndexPaths:addIndexPaths];
+            }
+            if (deleteSectionsRange.length > 0) {
+                [self deleteSections:[NSIndexSet indexSetWithIndexesInRange:deleteSectionsRange]];
+            }
+            if (deleteIndexPaths.count > 0){
+                [self deleteItemsAtIndexPaths:deleteIndexPaths];
+            }
+        } completion:^(BOOL finished) {
+        }];
+    } @catch (NSException *exception) {
+        NSLog(@"Error updating collection view: %@", exception);
     }
 
     // reload sections the image will also be flashed
